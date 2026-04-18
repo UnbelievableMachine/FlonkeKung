@@ -1,3 +1,5 @@
+-- this is the main script for my game, its how I handle all the answers, questions, most of the server-client communication overall
+
 local tables = game.Workspace:WaitForChild("Tables")
 local players = game:GetService("Players")
 local replicated = game:GetService("ReplicatedStorage")
@@ -9,12 +11,17 @@ local dailyEvent = replicated:WaitForChild("DailyChallengeEvent")
 
 local spawnLoc = game.Workspace:WaitForChild("SpawnLoc")
 
+-- variables
+
 local categories = {}
 for categoryName, _ in moduleScript.Options do
 	table.insert(categories, categoryName)
 end
 
+-- getting categories from my module
+
 local readyPlayers = {}
+-- table for plrs
 
 local function eliminatePlayer(activePlayers, player, tableFolder, correctWord, i)
 	if player then
@@ -22,7 +29,7 @@ local function eliminatePlayer(activePlayers, player, tableFolder, correctWord, 
 		if leaderstats then
 			local streak = leaderstats:FindFirstChild("Streak")
 			if streak then
-				streak.Value = 0
+				streak.Value = 0 -- setting plr streak to 0 when elim
 			end
 		end
 
@@ -79,17 +86,18 @@ local function eliminatePlayer(activePlayers, player, tableFolder, correctWord, 
 
 		for _, plr in activePlayers do
 			if plr ~= player then
-				eventHandler:FireClient(plr, "Eliminated", player)
+				eventHandler:FireClient(plr, "Eliminated", player) -- just making a message pop up of who got eliminated
 			elseif plr == player then
-				eventHandler:FireClient(plr, "Wrong", player, correctWord, i)
+				eventHandler:FireClient(plr, "Wrong", player, correctWord, i) -- eliminating actual plr
 			end
 		end
 	end
 end
 
-local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, timerTaskRef)
+local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, timerTaskRef) -- get answr from plr
 	local answered = false
 	local answer = nil
+-- bools
 
 	if timerTaskRef.task then task.cancel(timerTaskRef.task) end
 	timerTaskRef.task = task.spawn(function()
@@ -97,16 +105,16 @@ local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, 
 		for _, plr in activePlayers do
 			eventHandler:FireClient(plr, "Time", 8, nmbr)
 		end
-		while not answered and secs < 8 do
+		while not answered and secs < 8 do -- plr gets 8 sec to answer
 			task.wait(1)
 			secs += 1
 			for _, plr in activePlayers do
-				eventHandler:FireClient(plr, "Time", 8 - secs, nmbr)
+				eventHandler:FireClient(plr, "Time", 8 - secs, nmbr) -- make timer visible
 			end
 		end
 	end)
 
-	local correctAnswer = answerTable[nmbr]
+	local correctAnswer = answerTable[nmbr] -- finding the correct answer
 	local ran = math.random(1, 10)
 	local ranCategory = moduleScript.Options[categories[ran]]
 	local randomQuestions = {}
@@ -114,16 +122,16 @@ local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, 
 
 	while #randomQuestions < 4 do
 		local ran = math.random(1, 10)
-		local word = ranCategory[ran]
+		local word = ranCategory[ran] -- getting word from cat
 		if not usedWords[word] then
-			usedWords[word] = true
-			table.insert(randomQuestions, word)
+			usedWords[word] = true -- to see if word is used
+			table.insert(randomQuestions, word) -- inserting
 		end
 	end
 
 	if not usedWords[correctAnswer] then
 		local replaceIndex = math.random(1, 4)
-		randomQuestions[replaceIndex] = correctAnswer
+		randomQuestions[replaceIndex] = correctAnswer -- if correct answer didnt get choosen, then replace ran 1 to 4
 	end
 
 	local inserted = false
@@ -141,7 +149,7 @@ local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, 
 	eventHandler:FireClient(player, "Question", nmbr, randomQuestions)
 
 	local conn
-	conn = eventHandler.OnServerEvent:Connect(function(plr, arg, arg2)
+	conn = eventHandler.OnServerEvent:Connect(function(plr, arg, arg2) -- creating temp connection
 		if plr ~= player then return end
 		if answered then return end
 		if arg ~= "Question" then return end
@@ -151,7 +159,7 @@ local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, 
 	end)
 
 	local elapsed = 0
-	while not answered and elapsed < 10 do
+	while not answered and elapsed < 10 do -- plr gets 10 sec
 		task.wait(0.1)
 		elapsed += 0.1
 	end
@@ -162,13 +170,13 @@ local function getAnswer(player, activePlayers, nmbr, answerTable, tableFolder, 
 	eventHandler:FireClient(player, "Hide")
 
 	if not answered then
-		eliminatePlayer(activePlayers, player, tableFolder)
+		eliminatePlayer(activePlayers, player, tableFolder) -- no answer = elim
 	end
 
-	return answer
+	return answer -- returning plrs answer
 end
 
-local function chooseOption(player, activePlayers, answerTable)
+local function chooseOption(player, activePlayers, answerTable) -- stuff here is similiar to getanswer func
 	local answered = false
 	local answer = nil
 	local number = nil
@@ -220,9 +228,9 @@ local function chooseOption(player, activePlayers, answerTable)
 	return answer, number
 end
 
-local function startTableGame(tableFolder)
-	local activePlayers = {}
-	local playerBoosts = {}
+local function startTableGame(tableFolder) -- the actual main function to start the game
+	local activePlayers = {} -- getting the players
+	local playerBoosts = {} -- used for if player has a skin equipped, so they get their money boost
 	local timerTaskRef = { task = nil }
 
 	for _, part in tableFolder:GetDescendants() do
@@ -231,52 +239,52 @@ local function startTableGame(tableFolder)
 				local player = players:GetPlayerFromCharacter(part.Occupant.Parent)
 				if player then
 					table.insert(activePlayers, player)
-					eventHandler:FireClient(player, "Start")
+					eventHandler:FireClient(player, "Start") -- sending to all seated plrs at that table
 				end
 			end
 		end
 	end
 
-	if #activePlayers < 2 then return end
+	if #activePlayers < 2 then return end -- just so we dont play with 1 plr
 
 	local answerTable = {}
 	for i = 1, 10 do
 		answerTable[i] = tostring(i)
-	end
+	end -- all answers are at start just a numb
 
 	for _, plr in activePlayers do
 		local equipped = plr:FindFirstChild("Equipped")
 		if equipped then
 			local boost = chairBoosts.Boosts[equipped.Value]
 			if boost then
-				playerBoosts[plr] = boost
+				playerBoosts[plr] = boost -- inserting their boosts
 			end
 		end
 	end
 
-	local chooserCount = 0
+	local chooserCount = 0 -- so we can cycle who chooses
 
 	task.wait(11.5)
 
-	local roundOffset = 0
+	local roundOffset = 0 -- so the same plr doesnt always get the same turn
 
 	while #activePlayers > 1 do
 		for i = 1, 10 do
 			if #activePlayers == 1 then return activePlayers[1] end
 
-			local player = activePlayers[(i - 1 + roundOffset) % #activePlayers + 1]
+			local player = activePlayers[(i - 1 + roundOffset) % #activePlayers + 1] -- getting the plr, index - 1 + roundoffset, then we are getting the remainder after dividing, then +1
 			
 			for _, plr in activePlayers do
-				eventHandler:FireClient(plr, "FocusPlayer", player.Name)
+				eventHandler:FireClient(plr, "FocusPlayer", player.Name) -- focusing on answering plr
 			end
 
-			local answer = getAnswer(player, activePlayers, i, answerTable, tableFolder, timerTaskRef)
+			local answer = getAnswer(player, activePlayers, i, answerTable, tableFolder, timerTaskRef) -- answerfunc
 
-			if answer == nil or answer ~= answerTable[i] then
+			if answer == nil or answer ~= answerTable[i] then -- if wrong then
 				eliminatePlayer(activePlayers, player, tableFolder, answerTable[i], i)
 				table.remove(activePlayers, table.find(activePlayers, player))
 
-			elseif answer == answerTable[i] then
+			elseif answer == answerTable[i] then -- if correct then
 				local leaderstats = player:FindFirstChild("leaderstats")
 				if leaderstats then
 					local money = leaderstats:FindFirstChild("Money")
@@ -325,7 +333,7 @@ local function startTableGame(tableFolder)
 		end
 
 		if #availableNumbers == 0 then
-			return activePlayers
+			return activePlayers -- returning all left if all numbers are words, so everyone who is left wins
 		end
 
 		local word, nmbr = chooseOption(playerChooser, activePlayers, answerTable)
@@ -347,15 +355,15 @@ local function startTableGame(tableFolder)
 		end
 	end
 
-	return activePlayers[1]
+	return activePlayers[1] -- returning winner
 end
 
 for _, object in tables:GetDescendants() do
 	if object:IsA("ProximityPrompt") then
 		local tableFolder = object.Parent.Parent
-		readyPlayers[tableFolder] = {}
+		readyPlayers[tableFolder] = {} -- creating tablefolder for each table
 
-		eventHandler.OnServerEvent:Connect(function(player, arg, sentTable)
+		eventHandler.OnServerEvent:Connect(function(player, arg, sentTable) -- just the ready handler
 			if sentTable ~= tableFolder then return end
 			print("something sent")
 			if arg ~= "Ready" then
@@ -442,8 +450,8 @@ for _, object in tables:GetDescendants() do
 								local streakGamepass = winner:FindFirstChild("StreakGamepass")
 								local moneyGamepass = winner:FindFirstChild("MoneyGamepass")
 								local vipGamepass = winner:FindFirstChild("VIPGamepass")
-								local C_Wins = winner:FindFirstChild("C_Wins") -------- REMOVE WHEN DAILY IS CHANGED
-								local C_Spent = winner:FindFirstChild("C_Spent") ---------- REMOVE WHEN DAILY IS CHANGED
+								local C_Wins = winner:FindFirstChild("C_Wins") 
+								local C_Spent = winner:FindFirstChild("C_Spent") 
 
 								if wins and money and streak and winGamepass and streakGamepass and moneyGamepass and vipGamepass then
 									eventHandler:FireClient(winner, "Win")
@@ -554,7 +562,7 @@ for _, object in tables:GetDescendants() do
 			end
 		end
 
-		object.Triggered:Connect(function(player)
+		object.Triggered:Connect(function(player) -- seating plr to a unoccupied chair
 			for _, part in tableFolder:GetDescendants() do
 				if part:IsA("Seat") and part.Occupant == nil then
 					local char = player.Character
@@ -569,7 +577,7 @@ for _, object in tables:GetDescendants() do
 	end
 end
 
-game.Players.PlayerRemoving:Connect(function(player)
+game.Players.PlayerRemoving:Connect(function(player) -- just removing the skin from the chair
 	for _, object in tables:GetDescendants() do
 		if object:IsA("Seat") and object.Occupant then
 			local seatedPlayer = players:GetPlayerFromCharacter(object.Occupant.Parent)
